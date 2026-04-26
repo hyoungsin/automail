@@ -30,24 +30,10 @@ jobs:
       AUTO_SEND: "1"
       DRY_RUN: "0"
 
-      # LLM provider switch (gemini | genspark | openai)
-      # - Set via repo secret LLM_PROVIDER. Default is gemini.
-      LLM_PROVIDER: ${{ secrets.LLM_PROVIDER || 'gemini' }}
-
-      # Gemini
+      # LLM (Gemini)
+      LLM_PROVIDER: gemini
       GEMINI_API_KEY: ${{ secrets.GEMINI_API_KEY }}
       GEMINI_MODEL: ${{ secrets.GEMINI_MODEL }}
-
-      # Genspark
-      GENSPARK_API_KEY: ${{ secrets.GENSPARK_API_KEY }}
-      GENSPARK_BASE_URL: ${{ secrets.GENSPARK_BASE_URL }}
-      GENSPARK_TASK_TYPE: ${{ secrets.GENSPARK_TASK_TYPE }}
-      GENSPARK_PROJECT_ID: ${{ secrets.GENSPARK_PROJECT_ID }}
-
-      # OpenAI (optional)
-      OPENAI_API_KEY: ${{ secrets.OPENAI_API_KEY }}
-      OPENAI_BASE_URL: ${{ secrets.OPENAI_BASE_URL }}
-      OPENAI_MODEL: ${{ secrets.OPENAI_MODEL }}
 
     steps:
       - name: Checkout
@@ -88,7 +74,6 @@ jobs:
           GMAIL_TOKEN_JSON: ${{ secrets.GMAIL_TOKEN_JSON }}
 
       - name: Ensure Gemini key present
-        if: ${{ env.LLM_PROVIDER == 'gemini' }}
         run: |
           python - <<'PY'
           import os
@@ -96,28 +81,6 @@ jobs:
           if not key:
             raise SystemExit("Missing secret: GEMINI_API_KEY")
           print("Gemini key present")
-          PY
-
-      - name: Ensure Genspark key present
-        if: ${{ env.LLM_PROVIDER == 'genspark' }}
-        run: |
-          python - <<'PY'
-          import os
-          key = (os.environ.get("GENSPARK_API_KEY") or "").strip()
-          if not key:
-            raise SystemExit("Missing secret: GENSPARK_API_KEY")
-          print("Genspark key present")
-          PY
-
-      - name: Ensure OpenAI key present
-        if: ${{ env.LLM_PROVIDER == 'openai' }}
-        run: |
-          python - <<'PY'
-          import os
-          key = (os.environ.get("OPENAI_API_KEY") or "").strip()
-          if not key:
-            raise SystemExit("Missing secret: OPENAI_API_KEY")
-          print("OpenAI key present")
           PY
 
       - name: Run digest (send)
