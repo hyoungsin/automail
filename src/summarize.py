@@ -4,6 +4,7 @@ import json
 import logging
 import time
 from datetime import datetime, timezone
+from html import unescape
 
 import httpx
 
@@ -18,13 +19,32 @@ def _tz_name() -> str:
 
 def rule_based_digest(sections: list[dict]) -> str:
     """프리셋별로 이미 포맷된 블록을 묶은 마크다운."""
+    # 섹션 제목에 아이콘을 붙여 plain text에서도 구분을 강화한다.
+    def _badge(title: str) -> str:
+        if "필독" in title:
+            return "🟥"
+        if "참고" in title:
+            return "🟦"
+        if "홍보" in title or "프로모션" in title:
+            return "🟨"
+        return "⬜"
+
     lines = [
         f"# 일일 메일 요약 ({datetime.now().strftime('%Y-%m-%d %H:%M')} {_tz_name()})",
         "",
     ]
+
+    # 상단 요약(섹션별 건수)
+    lines.extend(["## 요약 결과", ""])
     for sec in sections:
         title = sec.get("title", "")
-        lines.append(f"## {title}")
+        blocks = sec.get("blocks", []) or []
+        lines.append(f"- **{_badge(title)} {title}**: {len(blocks)}건")
+    lines.append("")
+
+    for sec in sections:
+        title = sec.get("title", "")
+        lines.append(f"## {_badge(title)} {title}")
         lines.append("")
         blocks = sec.get("blocks", [])
         if not blocks:
@@ -40,8 +60,10 @@ _SYSTEM = (
     "\n"
     "규칙:\n"
     "- 입력은 이미 마크다운이며, 섹션(##)과 메일 블록(###) 구조가 있습니다.\n"
+    "- 최상단의 '## 요약 결과'는 더 읽기 쉽게 재작성해도 됩니다(우선순위/액션 중심).\n"
     "- 각 메일 블록에서 아래 항목 라벨은 유지하세요: 발신, 수신, 요약, 열기.\n"
     "- 요약은 2~4줄로 다듬고, 불필요한 반복/광고문/푸터 문구는 제거하세요.\n"
+    "- HTML 엔티티가 있으면 사람이 읽게 풀어 쓰세요(예: &amp; → &, &#39; → ').\n"
     "- '해야 할 일/마감/요청'이 있으면 요약 첫 줄에 **[액션]** 으로 한 문장으로 드러내세요.\n"
     "- 섹션 의도는 유지하세요(예: 필독/참고/홍보).\n"
     "- 출력은 마크다운만 반환하세요(설명 금지)."
@@ -226,6 +248,9 @@ def _gemini_refine(markdown_input: str) -> str:
     if not api_key:
         logger.info("LLM refine skipped (Gemini): missing GEMINI_API_KEY")
         return markdown_input
+
+    # 스니펫에 섞여오는 HTML 엔티티를 최소한 사람이 읽기 좋게 변환
+    markdown_input = unescape(markdown_input)
 
     url = (
         "https://generativelanguage.googleapis.com/v1beta/models/"
