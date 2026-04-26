@@ -1,0 +1,31 @@
+## secrets / local-only
+.env
+token.json
+token.*.json
+credentials/
+
+## outputs / logs
+output/
+
+## python
+.venv/
+__pycache__/
+*.pyc
+.pytest_cache/
+
+## OS/editor
+.DS_Store
+Thumbs.db
+.vscode/
+
+.env
+.venv/
+venv/
+__pycache__/
+*.pyc
+credentials/*.json
+!credentials/.gitkeep
+output/*
+!output/.gitkeep
+token.json
+*.log
