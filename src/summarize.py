@@ -116,6 +116,8 @@ def _chat_completions_refine(
 
 def _openai_refine(markdown_input: str) -> str:
     api_key, base, model = config.openai_config()
+    if not api_key:
+        logger.info("LLM refine skipped (OpenAI): missing OPENAI_API_KEY")
     return _chat_completions_refine(
         markdown_input, label="OpenAI", api_key=api_key, base_url=base, model=model
     )
@@ -163,6 +165,7 @@ def _genspark_refine(markdown_input: str) -> str:
     """
     api_key, base, task_type, project_id = config.genspark_config()
     if not api_key:
+        logger.info("LLM refine skipped (Genspark): missing GENSPARK_API_KEY")
         return markdown_input
 
     url = f"{base.rstrip('/')}/api/tool_cli/agent_ask"
@@ -221,6 +224,7 @@ def _genspark_refine(markdown_input: str) -> str:
 def _gemini_refine(markdown_input: str) -> str:
     api_key, model = config.gemini_config()
     if not api_key:
+        logger.info("LLM refine skipped (Gemini): missing GEMINI_API_KEY")
         return markdown_input
 
     url = (
@@ -281,6 +285,7 @@ def _gemini_refine(markdown_input: str) -> str:
 
 def llm_refine_sync(markdown_input: str) -> str:
     provider = config.llm_provider()
+    logger.info("LLM provider: %s", provider)
     if provider == "genspark":
         return _genspark_refine(markdown_input)
     if provider == "gemini":
