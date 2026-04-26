@@ -1,14 +1,23 @@
 # 3단계: Gmail 검색 쿼리 (https://support.google.com/mail/answer/7190)
 # 예: 지난 24시간, 프로모션 제외, 주요 수신함 위주
 presets:
-  - id: last_24h_primary
-    name: "최근 24시간(프로모션 제외·주요)"
-    query: "newer_than:1d -category:promotions category:primary"
+  # 1) 반드시 볼 것: 안 읽은 메일 중 중요/주요
+  - id: must_read_unread
+    name: "필독(안 읽음·중요/주요)"
+    query: "newer_than:1d is:unread (is:important OR category:primary) -category:promotions"
+    enabled: true
+    max_messages: 30
+
+  # 2) 참고: 주요 수신함(읽음 포함)에서 최근 24시간
+  - id: primary_last_24h
+    name: "참고(최근 24시간·주요)"
+    query: "newer_than:1d category:primary -category:promotions"
     enabled: true
     max_messages: 40
 
-  - id: unread_important
-    name: "읽지 않은 중요 메일"
-    query: "is:unread is:important newer_than:1d"
-    enabled: false
-    max_messages: 25
+  # 3) 홍보/스팸성 후보: 프로모션 카테고리
+  - id: promotions_last_24h
+    name: "홍보/프로모션(스팸성 후보)"
+    query: "newer_than:1d category:promotions"
+    enabled: true
+    max_messages: 60

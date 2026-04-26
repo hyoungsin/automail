@@ -30,12 +30,10 @@ jobs:
       AUTO_SEND: "1"
       DRY_RUN: "0"
 
-      # LLM optional (leave empty to run rule-based only)
-      LLM_PROVIDER: ${{ secrets.LLM_PROVIDER }}
-      OPENAI_API_KEY: ${{ secrets.OPENAI_API_KEY }}
+      # LLM (Gemini 권장: 무료/저비용)
+      LLM_PROVIDER: gemini
       GEMINI_API_KEY: ${{ secrets.GEMINI_API_KEY }}
-      GENSPARK_API_KEY: ${{ secrets.GENSPARK_API_KEY }}
-      GENSPARK_BASE_URL: ${{ secrets.GENSPARK_BASE_URL }}
+      GEMINI_MODEL: ${{ secrets.GEMINI_MODEL }}
 
     steps:
       - name: Checkout
