@@ -30,10 +30,12 @@ jobs:
       AUTO_SEND: "1"
       DRY_RUN: "0"
 
-      # LLM (Gemini 권장: 무료/저비용)
-      LLM_PROVIDER: gemini
-      GEMINI_API_KEY: ${{ secrets.GEMINI_API_KEY }}
-      GEMINI_MODEL: ${{ secrets.GEMINI_MODEL }}
+      # LLM (테스트: Genspark)
+      LLM_PROVIDER: genspark
+      GENSPARK_API_KEY: ${{ secrets.GENSPARK_API_KEY }}
+      GENSPARK_BASE_URL: ${{ secrets.GENSPARK_BASE_URL }}
+      GENSPARK_TASK_TYPE: ${{ secrets.GENSPARK_TASK_TYPE }}
+      GENSPARK_PROJECT_ID: ${{ secrets.GENSPARK_PROJECT_ID }}
 
     steps:
       - name: Checkout
@@ -73,14 +75,14 @@ jobs:
           GMAIL_CLIENT_SECRET_JSON: ${{ secrets.GMAIL_CLIENT_SECRET_JSON }}
           GMAIL_TOKEN_JSON: ${{ secrets.GMAIL_TOKEN_JSON }}
 
-      - name: Ensure Gemini key present
+      - name: Ensure Genspark key present
         run: |
           python - <<'PY'
           import os
-          key = (os.environ.get("GEMINI_API_KEY") or "").strip()
+          key = (os.environ.get("GENSPARK_API_KEY") or "").strip()
           if not key:
-            raise SystemExit("Missing secret: GEMINI_API_KEY (Gemini refine will be skipped otherwise)")
-          print("Gemini key present")
+            raise SystemExit("Missing secret: GENSPARK_API_KEY (Genspark refine will be skipped otherwise)")
+          print("Genspark key present")
           PY
 
       - name: Run digest (send)
