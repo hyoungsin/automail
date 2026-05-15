@@ -3,6 +3,7 @@ from __future__ import annotations
 import base64
 import time
 from datetime import datetime, timezone
+from email.headerregistry import Address
 from email.mime.multipart import MIMEMultipart
 from email.mime.text import MIMEText
 
@@ -149,8 +150,26 @@ def gmail_web_url(message_id: str) -> str:
     return f"https://mail.google.com/mail/u/0/#all/{message_id}"
 
 
-def _mime_raw(to_addr: str, subject: str, body_text: str) -> str:
+def _from_header(service) -> str | None:
+    """
+    GMAIL_FROM_DISPLAY_NAME 이 설정된 경우에만 From 헤더를 만듭니다.
+    주소는 항상 OAuth로 로그인한 계정(users.getProfile)과 동일하게 맞춥니다.
+    (다른 주소를 넣으면 Gmail이 거부하거나 덮어쓸 수 있음.)
+    """
+    display = config.gmail_from_display_name()
+    if not display:
+        return None
+    profile = service.users().getProfile(userId="me").execute()
+    addr_spec = (profile.get("emailAddress") or "").strip()
+    if not addr_spec:
+        return None
+    return str(Address(display_name=display, addr_spec=addr_spec))
+
+
+def _mime_raw(to_addr: str, subject: str, body_text: str, *, from_header: str | None = None) -> str:
     msg = MIMEMultipart("alternative")
+    if from_header:
+        msg["From"] = from_header
     msg["to"] = to_addr
     msg["subject"] = subject
     msg.attach(MIMEText(body_text, "plain", "utf-8"))
@@ -158,7 +177,7 @@ def _mime_raw(to_addr: str, subject: str, body_text: str) -> str:
 
 
 def create_draft(service, to_addr: str, subject: str, body_text: str) -> str:
-    raw = _mime_raw(to_addr, subject, body_text)
+    raw = _mime_raw(to_addr, subject, body_text, from_header=_from_header(service))
     draft = (
         service.users()
         .drafts()
@@ -169,7 +188,7 @@ def create_draft(service, to_addr: str, subject: str, body_text: str) -> str:
 
 
 def send_message(service, to_addr: str, subject: str, body_text: str) -> str:
-    raw = _mime_raw(to_addr, subject, body_text)
+    raw = _mime_raw(to_addr, subject, body_text, from_header=_from_header(service))
     sent = (
         service.users()
         .messages()

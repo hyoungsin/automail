@@ -1,337 +1,314 @@
-## automail
+# automail
 
-매일(또는 수동) **Gmail 검색 → 요약 → 발송(또는 초안 생성)** 자동화 프로젝트입니다.
+매일(또는 수동) **Gmail 검색 → 요약 → 발송** 자동화 프로젝트입니다.
+
+> 프로젝트 폴더: `D:\BIG\coding\automail`
 
 ---
 
-## Github배포 (mono-repository 기준)
+## 0. 이게 뭐 하는 건가요?
 
-PowerShell에서 `automail` 폴더 기준:
+- 매일 아침 내 Gmail에서 정해 둔 조건(예: 안 읽은 메일, 최근 24시간 등)으로 메일을 모아
+- LLM으로 요약하고
+- 정해 둔 수신자에게 자동으로 **요약 메일을 보내거나** Gmail **초안**을 만들어 둡니다.
+
+발송 방식은 두 가지 중 골라 쓸 수 있어요.
+
+| 방식 | PC 꺼져도 동작? | 추천 |
+|---|---|---|
+| **GitHub Actions** (이 저장소에 포함된 워크플로우) | ✅ 예 | **★ 추천** |
+| **Windows 작업 스케줄러** (로컬 PC) | ❌ 아니오 (PC 켜져 있어야) | 보조 |
+
+---
+
+## 1. 빠른 시작 (처음 한 번만)
+
+### 1.1 가상환경·패키지 설치
+
+PowerShell 열고:
 
 ```powershell
-cd D:\BIG\vive-coding\automail
-git init (git을 초기화하기,최초1번 only)
-git add . (git안의 모든 파일을 복사하기)
-git commit -m "first commit" (git version 기록)
-git branch -M main (git의 저장위치를 main으로)
-git remote add origin https://github.com/hyoungsin/automail.git
-    (git local 과 git website/ssh 와 연결하기,최초1번 only)
-git push -u origin main (git website에 최종등록하기)
-```
-
-> 주의: `.env`, `token.json`, `credentials/` 등 민감정보는 `.gitignore`로 **GitHub에 올라가지 않게** 되어 있어야 합니다.
-
----
-
-## GitHub Actions로 “PC 꺼도” 매일 08:00 자동 실행
-
-이 저장소에는 `automail gmail digest` 워크플로우가 포함되어 있고,
-**매일 08:00 KST(= 23:00 UTC)**에 실행되도록 설정되어 있습니다.
-
-### 1) GitHub 설정(Secrets 등록)
-
-GitHub 저장소 → **Settings → Secrets and variables → Actions → New repository secret** 에서 아래 3개를 등록합니다.
-
-- **`GMAIL_CLIENT_SECRET_JSON`**: 로컬 `credentials/client_secret.json` **파일 전체(JSON 전체)** 붙여넣기
-- **`GMAIL_TOKEN_JSON`**: 로컬 `token.json` **파일 전체(JSON 전체)** 붙여넣기
-- **`DIGEST_PRODUCTION_RECIPIENT`**: 수신자(예: `marius.oh@lge.com`)
-
-### 2) 1회 테스트 실행
-
-GitHub 저장소 → **Actions** → `automail gmail digest` → **Run workflow**
-
-### 3) 끊길 수 있는 경우(유일)
-
-Actions는 브라우저 로그인 창을 띄울 수 없어, `token.json`이 **invalid_grant(만료/철회)** 되면 실패합니다.
-이 경우 로컬에서 아래를 한 번 실행해 새 토큰을 만든 뒤, GitHub Secret `GMAIL_TOKEN_JSON`만 갱신하면 됩니다.
-
-```powershell
-cd D:\BIG\vive-coding\automail
-.\.venv\Scripts\python.exe scripts\gmail_digest.py --auth-smoke
-```
-
----
-
-## 더 자세한 문서
-
-- 로컬 실행/구조/트러블슈팅: `workflow.md`
-
-## 1. 무엇을 하는 프로젝트인가
-
-| 항목 | 내용 |
-|------|------|
-| 목표 | 매일(또는 수동) **Gmail 검색 → 요약 → 발송 설계(초안/드래프트)** |
-| 스택 | Python 3, Gmail API(OAuth), 선택 LLM(Genspark / Gemini / OpenAI) |
-| 발송 방식 | **즉시 발송이 아니라 Gmail 초안 생성**이 기본(확인 후 발송) |
-
-**데이터 흐름:** 스크립트 실행 → YAML 검색 프리셋 → 메일 메타·스니펫 수집 → 규칙 기반 마크다운 → (선택) LLM 다듬기 → `output/` 저장 → (설정 시) Gmail 드래프트.
-
----
-
-## 2. 폴더 구조
-
-```
-automail/
-├── .env                    # 비밀·설정 (git 제외)
-├── .env.example            # 변수 템플릿
-├── requirements.txt
-├── token.json              # OAuth 갱신 토큰 (git 제외, 최초 로그인 후 생성)
-├── config/
-│   └── search_presets.yaml # Gmail 검색 쿼리·enabled·max_messages
-├── credentials/
-│   └── client_secret.json  # Google Cloud OAuth 클라이언트 JSON (git 제외)
-├── output/                 # summary_*.md, run_*.json, send_history.jsonl, error_*.json
-├── scripts/
-│   ├── gmail_digest.py     # 메인 CLI
-│   └── schedule_windows.ps1# Windows 매일 08:00 작업 등록
-└── src/
-    ├── config.py           # .env 로드
-    ├── gmail_client.py     # OAuth, 검색, 드래프트
-    ├── search.py           # YAML 프리셋
-    ├── compose.py          # 메일 블록·드래프트 본문
-    ├── summarize.py        # 규칙 요약 + LLM(Gemini / Genspark agent_ask / OpenAI)
-    ├── pipeline.py         # 전체 오케스트레이션
-    └── history.py          # send_history.jsonl
-```
-
----
-
-## 3. 최초 설정 (한 번)
-
-### 3.1 Python 가상환경
-
-PowerShell에서 프로젝트 루트(`automail`) 기준:
-
-```powershell
-cd D:\BIG\vive-coding\automail
+cd D:\BIG\coding\automail
 python -m venv .venv
 .\.venv\Scripts\pip.exe install -r requirements.txt
 ```
 
-이후 예시 명령은 모두 **`.venv`의 python** 사용:
-
-```powershell
-.\.venv\Scripts\python.exe scripts\gmail_digest.py [옵션]
-```
-
-### 3.2 환경 변수
+### 1.2 환경 변수 파일 만들기
 
 ```powershell
 copy .env.example .env
 ```
 
-`.env`에서 최소로 채울 항목은 **`.env.example` 주석과 동일**. 요약:
+`.env`를 메모장으로 열어서 필요한 값(특히 `DIGEST_RECIPIENT`, LLM 키)을 채웁니다. 자세한 항목은 [§7 환경 변수](#7-환경-변수) 참고.
 
-| 변수 | 용도 |
-|------|------|
-| `GMAIL_CREDENTIALS_PATH` | OAuth 클라이언트 JSON 경로 (기본 `credentials/client_secret.json`) |
-| `GMAIL_TOKEN_PATH` | 저장할 refresh 토큰 (기본 `token.json`) |
-| `DIGEST_RECIPIENT` | 테스트용 수신(초안 받을 주소) |
-| `USE_PRODUCTION_RECIPIENT` / `DIGEST_PRODUCTION_RECIPIENT` | 운영 전환 시 |
-| `CREATE_GMAIL_DRAFT` / `DRY_RUN` | 드래프트 생성 여부, 파일만 저장 |
-| `AUTO_SEND` | `1`이면 초안 대신 즉시 발송(`DIGEST_*` 수신자) |
-| `LLM_PROVIDER` | `genspark` / `gemini` / `openai` 또는 키 기반 자동 선택 |
-| Genspark | `GENSPARK_API_KEY`(또는 `GSK_API_KEY`, `GSK_KEY`), `GENSPARK_BASE_URL`(기본 `https://www.genspark.ai`), `GENSPARK_TASK_TYPE`(기본 `super_agent`) |
-| Gemini | `GEMINI_API_KEY` 또는 `GOOGLE_AI_API_KEY`, `GEMINI_MODEL` |
-| OpenAI | `OPENAI_API_KEY`, `OPENAI_BASE_URL`, `OPENAI_MODEL` |
+### 1.3 Google Cloud OAuth 설정 (Gmail API 사용)
 
-### 3.3 Google Cloud (Gmail API)
+처음 한 번만:
 
-1. 프로젝트 생성 → **Gmail API 사용 설정**  
-2. **OAuth 클라이언트** 유형: **데스크톱** → JSON 다운로드 → `credentials/client_secret.json` 등으로 저장  
-3. OAuth 동의 화면: 앱이 **테스트**면 **테스트 사용자**에 로그인할 Gmail 추가  
+1. [Google Cloud Console](https://console.cloud.google.com/) 에서 프로젝트 만들기
+2. **APIs & Services → Library** → **Gmail API** 검색 → **사용 설정**
+3. **APIs & Services → Credentials** → **OAuth client ID 만들기** → 유형은 **데스크톱 앱**
+4. 다운로드한 JSON을 **`credentials/client_secret.json`** 으로 저장
+5. **APIs & Services → OAuth consent screen (새 UI에선 `대상`)** → **테스트 사용자**에 본인 Gmail 추가
 
----
-
-## 4. 권장 검증 순서 (명령어)
-
-아래는 **위에서 아래로** 실행하는 것을 권장합니다.
+### 1.4 최초 로그인 (token.json 만들기)
 
 ```powershell
-cd D:\BIG\vive-coding\automail
-```
-
-### 4.1 Gmail 연결만
-
-```powershell
+cd D:\BIG\coding\automail
 .\.venv\Scripts\python.exe scripts\gmail_digest.py --auth-smoke
 ```
 
-브라우저 로그인 후 `token.json` 생성되면 성공.
+브라우저가 열리면:
+1. 본인 Gmail 로그인
+2. "Google에서 확인하지 않은 앱" 화면 → **왼쪽의 `계속`** 클릭 (오른쪽 큰 버튼은 취소)
+3. 권한 동의 화면 → **`모두 선택`** 체크박스 클릭 → **오른쪽 아래 `계속`**
+4. "The authentication flow has completed." 메시지 + PowerShell에 **`Gmail API 연결 성공`** 뜨면 끝
 
-### 4.2 검색 건수만 (LLM·드래프트 없음)
-
-```powershell
-.\.venv\Scripts\python.exe scripts\gmail_digest.py --search-only
-```
-
-### 4.3 파일만 (LLM 끔, 드래프트 없음)
-
-```powershell
-.\.venv\Scripts\python.exe scripts\gmail_digest.py --no-llm --dry-run
-```
-
-### 4.4 LLM 포함, 파일만
-
-```powershell
-.\.venv\Scripts\python.exe scripts\gmail_digest.py --dry-run
-```
-
-### 4.5 운영에 가깝게 (요약 파일 + Gmail 초안)
-
-```powershell
-.\.venv\Scripts\python.exe scripts\gmail_digest.py
-```
-
-(`.env`에서 `DRY_RUN=0`, `CREATE_GMAIL_DRAFT=1`, `DIGEST_RECIPIENT` 필요)
-
-### 4.6 CLI 옵션 요약
-
-| 옵션 | 의미 |
-|------|------|
-| `--auth-smoke` | API 연결만 확인 |
-| `--search-only` | 프리셋별 검색 건수 JSON 출력 |
-| `--no-llm` | 규칙 기반 마크다운만 (LLM 호출 안 함) |
-| `--dry-run` | `output/` 저장만, Gmail 드래프트 안 만듦 |
-| `--no-draft` | 이번 실행만 드래프트 생략 |
+→ `token.json` 파일이 생성됩니다.
 
 ---
 
-## 5. 검색 조건 수정
+## 2. 매일 자동 발송 - GitHub Actions (★ 추천)
 
-파일: `config/search_presets.yaml`
+**PC를 꺼도 매일 08:00 KST에 GitHub 서버에서 자동 실행**됩니다.
 
-- `query`: [Gmail 검색 연산자](https://support.google.com/mail/answer/7190)  
-- `enabled`: `true`인 프리셋만 실행  
-- `max_messages`: 프리셋당 상한  
+### 2.1 저장소 시크릿 등록 (처음 한 번)
+
+GitHub 저장소 → **Settings → Secrets and variables → Actions → New repository secret** 에서 등록:
+
+| Secret 이름 | 값 |
+|---|---|
+| `GMAIL_CLIENT_SECRET_JSON` | 로컬 `credentials/client_secret.json` **파일 전체 내용** |
+| `GMAIL_TOKEN_JSON` | 로컬 `token.json` **파일 전체 내용** |
+| `DIGEST_PRODUCTION_RECIPIENT` | 받는 사람 이메일 |
+| `GEMINI_API_KEY` | Gemini API 키 |
+| `GEMINI_MODEL` | 모델명 (예: `gemini-2.0-flash`) |
+
+> 파일 내용을 클립보드에 복사하려면:
+> ```powershell
+> Get-Content D:\BIG\coding\automail\token.json -Raw | Set-Clipboard
+> ```
+
+### 2.2 수동 실행으로 테스트
+
+GitHub 저장소 → **Actions** → **`automail gmail digest`** → **Run workflow** → **Branch: main** → **Run workflow**
+
+녹색 체크 ✅ 뜨면 성공. 받는 사람 메일함 확인.
+
+### 2.3 매일 자동 실행
+
+별도 설정 없이 매일 **08:00 KST(= 23:00 UTC)** 자동 실행됩니다. 일정은 `.github/workflows/automail.yml`의 `cron`에 정의되어 있어요.
+
+### 2.4 token.json이 만료되면
+
+GitHub Actions는 브라우저 로그인 창을 띄울 수 없어서, **`token.json`이 만료/철회되면 실패**합니다. 이때는:
+
+```powershell
+cd D:\BIG\coding\automail
+del token.json
+.\.venv\Scripts\python.exe scripts\gmail_digest.py --auth-smoke
+```
+
+위와 같이 로컬에서 새 토큰을 만든 뒤, **`GMAIL_TOKEN_JSON` 시크릿만 새 내용으로 업데이트**하면 됩니다.
 
 ---
 
-## 6. Windows 매일 08:00 자동 실행
+## 3. 매일 자동 발송 - Windows 작업 스케줄러 (보조)
 
-### 6.1 작업 등록 (한 번)
+이건 **PC가 켜져 있을 때만** 동작합니다. GitHub Actions와 같이 쓸 필요는 없어요.
 
-PowerShell:
-
-```powershell
-powershell -NoProfile -ExecutionPolicy Bypass -File "D:\BIG\vive-coding\automail\scripts\schedule_windows.ps1"
-```
-
-테스트로 **다른 시각**(예: 당일 오후 2:20)에 맞추려면:
+### 3.1 작업 등록 (처음 한 번)
 
 ```powershell
-powershell -NoProfile -ExecutionPolicy Bypass -File "D:\BIG\vive-coding\automail\scripts\schedule_windows.ps1" -DailyAt "14:20"
+cd D:\BIG\coding\automail
+powershell -NoProfile -ExecutionPolicy Bypass -File .\scripts\schedule_windows.ps1
 ```
 
-다시 아침 8시로 되돌리려면 `-DailyAt "08:00"` 없이 위 첫 줄만 실행(기본값 08:00).
+기본은 매일 **08:00**. 다른 시각으로 바꾸려면:
 
-등록 이름: **`AutomailGmailDigest8AM`** (로컬 시각 매일 지정 시각, 로그인된 사용자·Interactive)
+```powershell
+powershell -NoProfile -ExecutionPolicy Bypass -File .\scripts\schedule_windows.ps1 -DailyAt "14:20"
+```
 
-### 중요: PC가 꺼져 있으면 실행되지 않음
+작업 이름: **`AutomailGmailDigest8AM`**
 
-- **전원 종료(Shut down)** 또는 **배터리 방전으로 꺼짐** → 작업 스케줄러는 **동작하지 않습니다.** (바뀐 적 없음, 클라우드가 아닌 **이 노트북 안에서만** 돕니다.)
-- **절전(Sleep)** 중이면, 작업 속성의 **「절전 모드를 해제하여 이 작업 실행」** 등을 켜야 8시에 깨어나며 돌 수 있습니다. (기기·설정에 따라 실패할 수 있음)
-- **로그아웃만** 한 상태(현재 등록 방식: Interactive)에서는 **실행이 안 될 수 있습니다.** 8시에 돌리려면 **로그인된 상태**를 권장합니다.
-- **배터리만 연결**일 때 막히지 않게 하려면 작업 **조건**에서 “AC 전원일 때만”을 끄는 식으로 설정합니다. (스크립트의 `AllowStartIfOnBatteries`는 이와 맞춤)
-
-**PC를 끈 채로도 매일 돌리려면** 로컬 스케줄이 아니라 **항상 켜진 서버**, 또는 **Cursor/클라우드 Automation**처럼 **본인 PC 밖에서** 스크립트를 돌리는 방식을 써야 합니다.
-
-### 6.2 수동으로 즉시 실행 (테스트)
+### 3.2 수동 실행 / 확인 / 삭제
 
 ```powershell
 Start-ScheduledTask -TaskName 'AutomailGmailDigest8AM'
-```
 
-### 6.3 확인·삭제
+Get-ScheduledTask -TaskName 'AutomailGmailDigest8AM' | Get-ScheduledTaskInfo
 
-- GUI: `Win + R` → `taskschd.msc` → 작업 라이브러리에서 이름 검색  
-- 삭제 (PowerShell):
-
-```powershell
 Unregister-ScheduledTask -TaskName 'AutomailGmailDigest8AM' -Confirm:$false
 ```
 
-### 6.4 Cursor Automation을 쓸 경우
+### 3.3 PC가 꺼져 있을 때 동작 여부
 
-동일 인자로 예약하면 됩니다:
-
-- 실행: `D:\BIG\vive-coding\automail\.venv\Scripts\python.exe`  
-- 인수: `"D:\BIG\vive-coding\automail\scripts\gmail_digest.py"`  
-- 시작 위치: `D:\BIG\vive-coding\automail`  
+- **종료(Shut down)** → ❌ 실행 안 됨
+- **절전(Sleep)** → 작업 속성에서 "절전 모드 해제하여 실행" 옵션이 켜져 있어야 깨어남
+- **로그아웃** → Interactive 작업이라 실행 안 될 수 있음
+- **PC를 자주 끈다면 GitHub Actions(§2)를 쓰세요**
 
 ---
 
-## 7. 산출물·로그
+## 4. 로컬 수동 실행 (테스트·디버깅)
+
+권장 순서로 위에서 아래로 실행해 보면 됩니다.
+
+```powershell
+cd D:\BIG\coding\automail
+```
+
+| 명령 | 무엇을 하나 |
+|---|---|
+| `.\.venv\Scripts\python.exe scripts\gmail_digest.py --auth-smoke` | Gmail API 연결만 확인 |
+| `.\.venv\Scripts\python.exe scripts\gmail_digest.py --search-only` | 프리셋별 검색 건수만 출력 |
+| `.\.venv\Scripts\python.exe scripts\gmail_digest.py --no-llm --dry-run` | LLM 안 쓰고 파일만 |
+| `.\.venv\Scripts\python.exe scripts\gmail_digest.py --dry-run` | LLM 포함, 파일만 (발송·드래프트 X) |
+| `.\.venv\Scripts\python.exe scripts\gmail_digest.py` | 실제 운영 (`.env` 설정대로 발송/초안) |
+
+---
+
+## 5. 자주 발생하는 에러와 해결
+
+### 5.1 `access_denied` (OAuth 권한 거부)
+
+**증상:** 브라우저 OAuth 진행 중 access_denied로 끝남.
+
+**원인 & 해결:**
+- 권한 동의 화면에서 **체크박스를 안 누르고 `계속`** → 체크박스 모두 선택 후 계속
+- "확인하지 않은 앱" 화면에서 **오른쪽 큰 파란 버튼(`안전한 환경으로 돌아가기`)** 을 누름 → **왼쪽 작은 `계속`** 눌러야 함
+- 로그인한 Gmail이 **테스트 사용자에 등록 안 됨** → Google Cloud Console → `대상` → 테스트 사용자에 추가
+- 시크릿 창에서 정확한 계정으로 다시 시도
+
+### 5.2 `invalid_grant: Token has been expired or revoked`
+
+**증상:** GitHub Actions 또는 스케줄러에서 실패.
+
+**해결:** §2.4 절차대로 로컬 재인증 → `GMAIL_TOKEN_JSON` 시크릿 업데이트.
+
+### 5.3 `getaddrinfo failed` (DNS 실패)
+
+**증상:** `oauth2.googleapis.com` 해석 실패.
+
+**원인:** 그 시점에 PC가 인터넷에 못 닿음 (Wi-Fi 끊김, VPN, 회사망 등).
+
+**해결:**
+```powershell
+ping oauth2.googleapis.com
+nslookup oauth2.googleapis.com
+```
+연결 회복 후 재실행. 반복되면 GitHub Actions로 옮기는 게 안정적.
+
+### 5.4 Gemini 429 (할당량 초과)
+
+`--no-llm` 옵션으로 우회하거나, 할당량/모델 조정.
+
+### 5.5 작업 스케줄러가 옛 경로를 가리킴
+
+폴더를 이동했다면 (§3.1) 재등록해서 경로 갱신.
+
+---
+
+## 6. 폴더 구조
+
+```
+automail/
+├── .env                       # 비밀·설정 (git 제외)
+├── .env.example               # 변수 템플릿
+├── requirements.txt
+├── token.json                 # OAuth 갱신 토큰 (git 제외)
+├── .github/workflows/
+│   └── automail.yml           # GitHub Actions 워크플로우 (매일 08:00 KST)
+├── config/
+│   └── search_presets.yaml    # Gmail 검색 쿼리·enabled·max_messages
+├── credentials/
+│   └── client_secret.json     # Google Cloud OAuth 클라이언트 JSON (git 제외)
+├── output/                    # summary_*.md, run_*.json, send_history.jsonl, error_*.json
+├── scripts/
+│   ├── gmail_digest.py        # 메인 CLI
+│   └── schedule_windows.ps1   # Windows 매일 작업 등록
+└── src/
+    ├── config.py              # .env 로드
+    ├── gmail_client.py        # OAuth, 검색, 발송
+    ├── search.py              # YAML 프리셋
+    ├── compose.py             # 메일 블록·본문
+    ├── summarize.py           # 규칙 요약 + LLM
+    ├── pipeline.py            # 전체 오케스트레이션
+    └── history.py             # send_history.jsonl
+```
+
+---
+
+## 7. 환경 변수
+
+`.env`에서 설정합니다.
+
+| 변수 | 용도 |
+|---|---|
+| `GMAIL_CREDENTIALS_PATH` | OAuth 클라이언트 JSON 경로 (기본 `credentials/client_secret.json`) |
+| `GMAIL_TOKEN_PATH` | refresh 토큰 경로 (기본 `token.json`) |
+| `GMAIL_FROM_DISPLAY_NAME` | (선택) 보낸 사람 표시 이름. 비우면 Gmail 계정 기본 이름. 주소는 항상 OAuth 계정과 동일(`getProfile`으로 자동 설정) |
+| `DIGEST_RECIPIENT` | 테스트용 수신자 |
+| `DIGEST_PRODUCTION_RECIPIENT` | 운영 수신자 |
+| `USE_PRODUCTION_RECIPIENT` | `1`이면 운영 수신자 사용 |
+| `CREATE_GMAIL_DRAFT` | `1`이면 Gmail 초안 생성 |
+| `AUTO_SEND` | `1`이면 초안 대신 즉시 발송 |
+| `DRY_RUN` | `1`이면 파일만 저장, 발송·초안 안 함 |
+| `LLM_PROVIDER` | `gemini` / `genspark` / `openai` |
+| `GEMINI_API_KEY`, `GEMINI_MODEL` | Gemini 사용 시 |
+| `GENSPARK_API_KEY`, `GENSPARK_BASE_URL` | Genspark 사용 시 |
+| `OPENAI_API_KEY`, `OPENAI_BASE_URL`, `OPENAI_MODEL` | OpenAI 사용 시 |
+
+---
+
+## 8. 검색 조건 수정
+
+`config/search_presets.yaml` 에서:
+
+- `query`: [Gmail 검색 연산자](https://support.google.com/mail/answer/7190)
+- `enabled`: `true`인 프리셋만 실행
+- `max_messages`: 프리셋당 최대 메일 수
+
+---
+
+## 9. 산출물
 
 | 경로 | 설명 |
-|------|------|
+|---|---|
 | `output/summary_*.md` | 다이제스트 마크다운 |
 | `output/run_*.json` | 실행 메타·건수 |
-| `output/send_history.jsonl` | 실행 이력 한 줄 JSON |
-| `output/error_*.json` | 실패 시 상세 |
-| `output/draft_id_*.txt` | (드래프트 생성 시) 초안 ID |
+| `output/send_history.jsonl` | 실행 이력 (한 줄 JSON) |
+| `output/error_*.json` | 실패 상세 |
+| `output/draft_id_*.txt` | 초안 생성 시 초안 ID |
+| `output/sent_message_id_*.txt` | 발송 시 메시지 ID |
 
 ---
 
-## 8. 원 문서의 1~10단계와 매핑
+## 10. GitHub에 처음 올릴 때 (한 번만)
 
-| 단계 | 이 저장소에서 |
-|------|----------------|
-| 1 Gmail API 준비 | Google Cloud + `credentials/client_secret.json` |
-| 2 스크립트 | `scripts/gmail_digest.py` |
-| 3 검색 조건 | `config/search_presets.yaml` |
-| 4 요약 형식 | `src/compose.py` |
-| 5·8 수신자 | `.env` `DIGEST_*`, `USE_PRODUCTION_RECIPIENT` |
-| 즉시 발송(선택) | `.env` `AUTO_SEND=1` → 초안 대신 발송(끝나면 `0`) |
-| 6 Secrets | `.env`, `token.json` |
-| 7 스케줄 | `schedule_windows.ps1` 또는 Cursor Automation |
-| 9 예외 | `output/error_*.json`, 로그, LLM 실패 시 규칙 기반 유지 |
-| 10 운영 | `send_history.jsonl`, 프리셋 조정, 토큰 주기 확인 |
+```powershell
+cd D:\BIG\coding\automail
+git init
+git add .
+git commit -m "first commit"
+git branch -M main
+git remote add origin https://github.com/hyoungsin/automail.git
+git push -u origin main
+```
 
----
-
-## 9. 알려진 이슈·팁
-
-- **`api.genspark.ai` DNS 실패:** Genspark는 **`https://www.genspark.ai`** + `POST /api/tool_cli/agent_ask`, 헤더 **`X-Api-Key`** 를 사용함 (`src/summarize.py`). `.env`에 옛 `api.genspark.ai`가 있으면 제거하거나 `www`로 변경.  
-- **Gemini 429:** 재시도 후 규칙 기반으로 폴백. 필요 시 `--no-llm` 또는 할당량·모델 조정.  
-- **OAuth 테스트 사용자:** 동의 화면이 테스트 모드면 로그인 계정을 테스트 사용자에 등록.  
-- **스케줄 실행:** 토큰 만료 시 실패할 수 있음 → 수동 `--auth-smoke`로 재인증.  
-- **API 키:** `.env`·채팅에 노출되지 않게 관리; 유출 시 재발급.
+> **주의:** `.env`, `token.json`, `credentials/`는 `.gitignore`로 GitHub에 올라가지 않게 막혀 있습니다. 시크릿은 §2.1 절차대로 **GitHub Settings → Secrets**에만 등록하세요.
 
 ---
 
-## 6.5 (대안) PC를 꺼도 매일 실행: GitHub Actions 크론
+## 11. 운영 체크리스트
 
-개인 PC를 자주 끄는 환경이라면 로컬 작업 스케줄러 대신 **GitHub Actions(항상 켜져 있는 실행 환경)**로 옮기는 것이 가장 간단합니다.
+매번 코드 수정·환경 변경 후 확인하면 좋은 순서:
 
-이 저장소에는 `automail/.github/workflows/automail.yml` 워크플로우가 포함되어 있으며,
-매일 **08:00 KST(= 23:00 UTC)**에 `python scripts/gmail_digest.py`를 실행하도록 되어 있습니다.
-
-### 준비물(Secrets 등록)
-
-GitHub 저장소 Settings → Secrets and variables → Actions → New repository secret:
-
-- `GMAIL_CLIENT_SECRET_JSON`: Google Cloud에서 받은 OAuth 클라이언트 JSON 파일 내용을 그대로 붙여넣기(`credentials/client_secret.json`)
-- `GMAIL_TOKEN_JSON`: 로컬에서 생성된 `token.json` 내용을 그대로 붙여넣기(헤드리스 refresh 용)
-- `DIGEST_PRODUCTION_RECIPIENT`: 수신자(예: `marius.oh@lge.com`)
-
-(선택) LLM을 쓰면:
-- `LLM_PROVIDER`, `OPENAI_API_KEY` / `GEMINI_API_KEY` / `GENSPARK_API_KEY` / `GENSPARK_BASE_URL`
-
-### 주의(헤드리스 OAuth)
-
-Actions는 브라우저 로그인 창을 띄울 수 없기 때문에,
-**`token.json`이 invalid_grant(만료/철회)**가 되면 워크플로우는 실패합니다.
-이 경우 로컬에서 `python scripts/gmail_digest.py --auth-smoke`로 재인증해서 새 `token.json`을 만든 뒤,
-GitHub Secret `GMAIL_TOKEN_JSON`을 업데이트하면 다시 정상 동작합니다.
-
----
-
-## 10. 다음에 개발할 때 빠른 체크리스트
-
-1. `.venv` 존재 + `pip install -r requirements.txt`  
-2. `credentials/client_secret.json` + `token.json` 유효성 (`--auth-smoke`)  
-3. `search_presets.yaml` 의도 반영 여부 (`--search-only`)  
-4. `output/summary_*.md` 품질 (`--dry-run` → 전체 실행)  
-5. Gmail 초안 확인 후 운영 수신자 전환  
-6. 스케줄 작업 존재 여부 (`taskschd.msc` 또는 `Get-ScheduledTask`)
+1. `.venv` 존재 + `pip install -r requirements.txt`
+2. `--auth-smoke`로 토큰 유효성 확인
+3. `--search-only`로 프리셋 의도 확인
+4. `--dry-run`으로 요약 품질 확인
+5. 실제 1회 발송 후 받는 사람 메일함 확인
+6. (로컬 스케줄러 사용 시) 작업 등록 상태 확인
+7. (GitHub Actions 사용 시) Actions 탭에서 최근 실행 성공 여부 확인

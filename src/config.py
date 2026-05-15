@@ -23,6 +23,15 @@ def gmail_token_path() -> Path:
     return _ROOT / p if not Path(p).is_absolute() else Path(p)
 
 
+def gmail_from_display_name() -> str | None:
+    """
+    비어 있지 않으면 발송/초안 MIME의 From 표시 이름으로 사용합니다.
+    주소는 Gmail API users.getProfile 로 OAuth 계정과 동일한 값만 씁니다.
+    """
+    n = os.getenv("GMAIL_FROM_DISPLAY_NAME", "").strip()
+    return n or None
+
+
 def digest_recipient() -> str | None:
     if os.getenv("USE_PRODUCTION_RECIPIENT", "0").strip() in ("1", "true", "yes"):
         prod = os.getenv("DIGEST_PRODUCTION_RECIPIENT", "").strip()

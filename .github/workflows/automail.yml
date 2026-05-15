@@ -22,6 +22,7 @@ jobs:
       # Gmail OAuth paths in workspace
       GMAIL_CREDENTIALS_PATH: credentials/client_secret.json
       GMAIL_TOKEN_PATH: token.json
+      GMAIL_FROM_DISPLAY_NAME: "JAMBRO"
 
       # Recipients / mode
       USE_PRODUCTION_RECIPIENT: "1"
