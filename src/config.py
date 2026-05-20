@@ -32,6 +32,17 @@ def gmail_from_display_name() -> str | None:
     return n or None
 
 
+def digest_exclude_senders() -> frozenset[str]:
+    """다이제스트에서 제외할 발신자(쉼표 구분). 기본: aimhyoungsin@gmail.com"""
+    raw = os.getenv(
+        "DIGEST_EXCLUDE_SENDERS",
+        "aimhyoungsin@gmail.com",
+    ).strip()
+    if not raw:
+        return frozenset()
+    return frozenset(s.strip().lower() for s in raw.split(",") if s.strip())
+
+
 def digest_recipient() -> str | None:
     if os.getenv("USE_PRODUCTION_RECIPIENT", "0").strip() in ("1", "true", "yes"):
         prod = os.getenv("DIGEST_PRODUCTION_RECIPIENT", "").strip()

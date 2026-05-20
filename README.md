@@ -289,12 +289,21 @@ automail/
 
 ```powershell
 cd D:\BIG\coding\automail
-git init
-git add .
-git commit -m "first commit"
-git branch -M main
-git remote add origin https://github.com/hyoungsin/automail.git
-git push -u origin main
+
+<최초 push>
+  - git init (git을 초기화하기,최초1번 only)
+  - git add . (git안의 모든 파일을 복사하기)
+  - git commit -m "first commit" (git version 기록)
+  - git branch -M main (git의 저장위치를 main으로)
+  - git remote add origin https://github.com/hyoungsin/jambro-contents-mall.git
+      (git local 과 git website/ssh 와 연결하기,최초1번 only)
+  - git push -u origin main (git website에 최종등록하기)
+
+<2번째 이후후>
+  - git add . (git안의 모든 파일을 복사하기)
+  - git commit -m "commit about something" (git version 기록)
+  - git branch -M main (git의 저장위치를 main으로)
+  - git push -u origin main (git website에 최종등록하기)
 ```
 
 > **주의:** `.env`, `token.json`, `credentials/`는 `.gitignore`로 GitHub에 올라가지 않게 막혀 있습니다. 시크릿은 §2.1 절차대로 **GitHub Settings → Secrets**에만 등록하세요.

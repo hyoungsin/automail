@@ -108,14 +108,24 @@ def run_digest(*, use_llm: bool = True, create_draft: bool | None = None) -> Pat
         preset_counts[preset.id] = len(ids)
         total_messages += len(ids)
         blocks: list[str] = []
+        exclude_senders = config.digest_exclude_senders()
+        item_no = 0
         for mid in ids:
             try:
                 headers, snippet = gmail_client.get_snippet(service, mid)
-                blocks.append(compose.format_message_block(mid, headers, snippet))
             except HttpError as e:
                 msg = gmail_client.http_error_message(e)
                 logger.warning("메일 메타 조회 실패 %s: %s", mid, msg)
                 blocks.append(f"(메일 {mid} 조회 실패: {msg})\n")
+                continue
+            sender = compose.parse_sender_email(headers.get("From", ""))
+            if sender and sender in exclude_senders:
+                logger.info("발신자 제외 [%s]: %s", sender, headers.get("Subject", mid))
+                continue
+            item_no += 1
+            blocks.append(
+                compose.format_message_block(mid, headers, snippet, index=item_no)
+            )
 
         sections_out.append(
             {
@@ -212,7 +222,7 @@ def run_digest(*, use_llm: bool = True, create_draft: bool | None = None) -> Pat
         )
         return md_path
 
-    body = compose.digest_full_markdown(compose.plain_intro(), final_text)
+    body = compose.digest_full_markdown("", final_text)
     subj = compose.draft_subject()
     sent_message_id: str | None = None
 
